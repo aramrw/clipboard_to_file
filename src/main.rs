@@ -25,6 +25,7 @@ fn main() {
     let is_secondary_instance = args.len() > 1 && args[1] == "secondary";
     let config = get_config().unwrap_or(create_config_if_not_exists().unwrap());
 
+    // if it reaches here the user has created a config / one exists
     if !is_secondary_instance {
         // main terminal (popup window)
         std::process::Command::new("clipboard_to_file.exe")
@@ -92,16 +93,21 @@ fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
 fn config_prompt_helper_file_types() -> Vec<String> {
     // define inputs here
     let mut file_types_input_vec: Vec<String> = Vec::new();
+    println!("\n\nFile type examples: `mp3` `jpg` `png` `svg`");
+    println!("Or Enter `Default` for `mp3` && `jpg`\n");
+    println!("Enter File Types: ");
 
     // prompt for file_types_p
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
         input = input.to_lowercase().trim().to_string();
-        if input.to_lowercase() == "done" {
+        if input.contains("done") {
             break;
-        } else if input.to_lowercase().contains(".") {
+        } else if input.contains(".") {
             file_types_input_vec.push(input.replace(".", "").trim().to_string());
+        } else if input.contains("default") {
+            file_types_input_vec = vec!["mp3".to_string(), "jpg".to_string()];
         } else {
             file_types_input_vec.push(input);
         }
@@ -115,7 +121,7 @@ fn config_prompt_helper_download_directory() -> String {
 
     // prompt for download_directory_p
     println!("\n\nExample Download Directory: C:\\Users\\ExampleUser\\Desktop");
-    println!("\n Enter a downloads directory: ");
+    println!("\nEnter a Downloads Directory: ");
     io::stdin().read_line(&mut download_dir_input).unwrap();
     download_dir_input = download_dir_input.trim_end().to_string();
 
