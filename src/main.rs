@@ -18,15 +18,17 @@ use winapi::um::winbase::CREATE_NO_WINDOW;
 struct Config {
     download_directory: String,
     file_types: Vec<String>,
+    debugger: bool,
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let is_secondary_instance = args.len() > 1 && args[1] == "secondary";
     let config = get_config().unwrap_or(create_config_if_not_exists().unwrap());
+    let previous_clipboard_text: String = "".to_string();
 
     // if it reaches here the user has created a config / one exists
-    if !is_secondary_instance {
+    if !is_secondary_instance && config.debugger != true {
         // main terminal (popup window)
         std::process::Command::new("clipboard_to_file.exe")
             .arg("secondary")
@@ -38,7 +40,7 @@ fn main() {
         std::process::exit(0);
     }
 
-    println!("\n\nWatching clipboard...\n\n");
+    println!("\nWatching clipboard...\n");
 
     loop {
         match download_clipboard_file(&config) {
@@ -46,7 +48,7 @@ fn main() {
             Err(e) => eprintln!("Failed to download file: {}", e),
         }
 
-        sleep(Duration::from_secs(5));
+        sleep(Duration::from_secs(1));
     }
 }
 
@@ -103,9 +105,11 @@ fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
 fn config_prompt_helper_file_types() -> Vec<String> {
     // define inputs here
     let mut file_types_input_vec: Vec<String> = Vec::new();
-    println!("\n\nFile type examples: `mp3` `jpg` `png` `svg`");
-    println!("Or Enter `Default` for `mp3` && `jpg`\n");
-    println!("Enter File Types: ");
+    println!("\nFile type examples: `mp3` `jpg` `png` `svg`");
+    println!("Enter `Done` once finished");
+    println!("Or Enter `Default` for `mp3` && `jpg`");
+
+    println!("\nEnter File Types: ");
 
     // prompt for file_types_p
     loop {
@@ -118,6 +122,7 @@ fn config_prompt_helper_file_types() -> Vec<String> {
             file_types_input_vec.push(input.replace(".", "").trim().to_string());
         } else if input.contains("default") {
             file_types_input_vec = vec!["mp3".to_string(), "jpg".to_string()];
+            return file_types_input_vec;
         } else {
             file_types_input_vec.push(input);
         }
@@ -130,7 +135,7 @@ fn config_prompt_helper_download_directory() -> String {
     let mut download_dir_input = String::new();
 
     // prompt for download_directory_p
-    println!("\n\nExample Download Directory: C:\\Users\\ExampleUser\\Desktop");
+    println!("Example Download Directory: C:\\Users\\ExampleUser\\Desktop");
     println!("\nEnter a Downloads Directory: ");
     io::stdin().read_line(&mut download_dir_input).unwrap();
     download_dir_input = download_dir_input.trim_end().to_string();
@@ -149,6 +154,7 @@ fn prompt_user_for_config_values() -> Config {
     Config {
         download_directory,
         file_types,
+        debugger: false,
     }
 }
 
