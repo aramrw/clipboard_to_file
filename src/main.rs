@@ -25,8 +25,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let is_secondary_instance = args.len() > 1 && args[1] == "secondary";
     let config = get_config().unwrap_or(create_config_if_not_exists().unwrap());
-    let previous_clipboard_text: String = "".to_string();
-
+    let mut previous_clipboard_text: String = "".to_string();
     // if it reaches here the user has created a config / one exists
     if !is_secondary_instance && config.debugger != true {
         // main terminal (popup window)
@@ -43,41 +42,57 @@ fn main() {
     println!("\nWatching clipboard...\n");
 
     loop {
-        match download_clipboard_file(&config) {
-            Ok(_) => { /*Do nothing */ }
-            Err(e) => eprintln!("Failed to download file: {}", e),
+        match download_clipboard_file(&config, &previous_clipboard_text) {
+            Ok(previous) => previous_clipboard_text = previous,
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    eprintln!("\nFailed to download file: {}", e);
+                } else {
+                    println!("\nFailed to download file: {}", e);
+                }
+            }
         }
 
         sleep(Duration::from_secs(1));
     }
 }
 
-fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
+fn download_clipboard_file(
+    config: &Config,
+    previous_clipboard_text: &String,
+) -> Result<String, std::io::Error> {
     match get_clipboard_string() {
         Ok(s) => {
             if s.starts_with("https://") || s.starts_with("https://") {
                 let response = get(&s).expect("Failed to send request");
                 if response.status().is_success() {
                     //println!("{}", response.status());
-                    let file_name = Path::new(&s).file_name().unwrap();
-                    for f_type in &config.file_types {
-                        if !file_name.to_str().unwrap().contains(f_type) {
-                            eprintln!("File does not contain {}; ", f_type);
-                            eprintln!(
-                                "To download {}'s, add `{}` to your config.json; ",
-                                f_type, f_type
-                            );
-                            return Ok(());
-                        }
+                    let file_name = Path::new(&s)
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+
+                    // check if the file contains config file types
+                    if config
+                        .file_types
+                        .iter()
+                        .all(|f_type| !file_name.contains(f_type))
+                    {
+                        eprintln!(
+                            "\n{:#?} does not contain any of the file types; ",
+                            file_name
+                        );
+                        eprintln!("\nTo download files of this type, add the extension to your config.json; ");
+                        return Ok(s);
                     }
                     let user_download_directory = &config.download_directory;
-                    let final_download_directory = format!(
-                        "{}\\{}",
-                        user_download_directory,
-                        file_name.to_str().unwrap().to_string()
-                    );
+                    let final_download_directory =
+                        format!("{}\\{}", user_download_directory, file_name,);
                     if Path::new(&final_download_directory).exists() {
                         return Err(Error::new(ErrorKind::AlreadyExists, "File already exists"));
+                        //return Ok(s);
                     }
                     let mut dest =
                         File::create(final_download_directory).expect("Failed to create file");
@@ -87,19 +102,24 @@ fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
                         "\nDownloaded {:#?} to {}\n",
                         file_name, user_download_directory
                     );
+                    // if no errors, return the clipboard back to the caller
+                    return Ok(s);
                 } else {
-                    println!("\nFailed to download file: {}\n", response.status());
+                    eprintln!("\nFailed to download file: {}", response.status());
+                    Ok(s)
                 }
             } else {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
-                    "URL must start with http:// or https://",
+                    "\nURL must start with http:// or https://",
                 ));
             }
         }
-        Err(e) => eprintln!("{}", e),
+        Err(e) => {
+            eprintln!("{}", e);
+            return Ok("".to_string());
+        }
     }
-    Ok(())
 }
 
 fn config_prompt_helper_file_types() -> Vec<String> {
