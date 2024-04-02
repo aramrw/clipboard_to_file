@@ -17,6 +17,7 @@ use winapi::um::winbase::CREATE_NO_WINDOW;
 #[derive(Serialize, Deserialize)]
 struct Config {
     download_directory: String,
+    file_types: Vec<String>,
 }
 
 fn main() {
@@ -88,22 +89,51 @@ fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn prompt_user_for_config_values() -> Config {
-    let mut input = String::new();
+fn config_prompt_helper_file_types() -> Vec<String> {
+    // define inputs here
+    let mut file_types_input_vec: Vec<String> = Vec::new();
+
+    // prompt for file_types_p
+    loop {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        input = input.to_lowercase().trim().to_string();
+        if input.to_lowercase() == "done" {
+            break;
+        } else if input.to_lowercase().contains(".") {
+            file_types_input_vec.push(input.replace(".", "").trim().to_string());
+        } else {
+            file_types_input_vec.push(input);
+        }
+    }
+    file_types_input_vec
+}
+
+fn config_prompt_helper_download_directory() -> String {
+    // define inputs here
+    let mut download_dir_input = String::new();
+
+    // prompt for download_directory_p
     println!("\n\nExample Download Directory: C:\\Users\\ExampleUser\\Desktop");
     println!("\n Enter a downloads directory: ");
-    io::stdin().read_line(&mut input).unwrap();
-    input = input.trim_end().to_string();
-    if !input.is_empty() && Path::new(&input).exists() {
-        // create a Config that contains the users inputs
-        let config = Config {
-            download_directory: input,
-        };
-        return config;
+    io::stdin().read_line(&mut download_dir_input).unwrap();
+    download_dir_input = download_dir_input.trim_end().to_string();
+
+    if !download_dir_input.is_empty() && Path::new(&download_dir_input).exists() {
+        return download_dir_input;
     } else {
-        eprintln!("Invalid download folder. Try again.");
-        return prompt_user_for_config_values();
-    };
+        return config_prompt_helper_download_directory();
+    }
+}
+
+fn prompt_user_for_config_values() -> Config {
+    let download_directory: String = config_prompt_helper_download_directory();
+    let file_types: Vec<String> = config_prompt_helper_file_types();
+
+    Config {
+        download_directory,
+        file_types,
+    }
 }
 
 fn get_config() -> Option<Config> {
