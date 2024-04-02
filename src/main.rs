@@ -58,6 +58,16 @@ fn download_clipboard_file(config: &Config) -> Result<(), std::io::Error> {
                 if response.status().is_success() {
                     //println!("{}", response.status());
                     let file_name = Path::new(&s).file_name().unwrap();
+                    for f_type in &config.file_types {
+                        if !file_name.to_str().unwrap().contains(f_type) {
+                            eprintln!("File does not contain {}; ", f_type);
+                            eprintln!(
+                                "To download {}'s, add `{}` to your config.json; ",
+                                f_type, f_type
+                            );
+                            return Ok(());
+                        }
+                    }
                     let user_download_directory = &config.download_directory;
                     let final_download_directory = format!(
                         "{}\\{}",
