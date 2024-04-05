@@ -27,7 +27,7 @@ fn main() {
     let config = get_config().unwrap_or(create_config_if_not_exists().unwrap());
     let mut previous_clipboard_text: String = "".to_string();
     // if it reaches here the user has created a config / one exists
-    if !is_secondary_instance && config.debugger != true {
+    if !is_secondary_instance && !config.debugger {
         // main terminal (popup window)
         std::process::Command::new("clipboard_to_file.exe")
             .arg("secondary")
@@ -39,11 +39,18 @@ fn main() {
         std::process::exit(0);
     }
 
-    println!("\nWatching clipboard...\n");
-
     loop {
         match download_clipboard_file(&config, &previous_clipboard_text) {
-            Ok(previous) => previous_clipboard_text = previous,
+            Ok(current) => {
+                if previous_clipboard_text != "" && previous_clipboard_text != current {
+                    //println!("\n{} != {}\n", previous_clipboard_text, current);
+                    std::fs::remove_file(previous_clipboard_text).unwrap();
+                    previous_clipboard_text = current
+                } else {
+                    // stitch the path together
+                    previous_clipboard_text = current
+                }
+            }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
                     eprintln!("\nFailed to download file: {}", e);
@@ -59,7 +66,7 @@ fn main() {
 
 fn download_clipboard_file(
     config: &Config,
-    previous_clipboard_text: &String,
+    _previous_clipboard_text: &str,
 ) -> Result<String, std::io::Error> {
     match get_clipboard_string() {
         Ok(s) => {
@@ -103,7 +110,8 @@ fn download_clipboard_file(
                         file_name, user_download_directory
                     );
                     // if no errors, return the clipboard back to the caller
-                    return Ok(s);
+                    let return_file_name = format!("{}\\{}", user_download_directory, file_name);
+                    return Ok(return_file_name);
                 } else {
                     eprintln!("\nFailed to download file: {}", response.status());
                     Ok(s)
