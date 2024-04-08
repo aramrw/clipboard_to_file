@@ -1,0 +1,3 @@
+- Deletes previously downloaded file
+- Doesn't make unneeded http requests
+- Auto closes after 5 minutes of idle time
