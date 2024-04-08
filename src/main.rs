@@ -39,19 +39,57 @@ fn main() {
         std::process::exit(0);
     }
 
+    let mut sys = sysinfo::System::new_all();
+
+    sys.refresh_processes();
+
+    for (pid, process) in sys.processes() {
+        if process.name().contains("clipboard_to_file") {
+            println!("Found clipboard_to_file.exe with PID: {}", pid);
+            if pid.as_u32() != std::process::id() {
+                println!(
+                    "Killing previous instance of clipboard_to_file.exe with PID: {}",
+                    pid
+                );
+                process.kill();
+            }
+        }
+    }
+
+    // count how many times the same cb text has been copied
+    let mut count = 0;
+    let user_download_directory = &config.download_directory;
+
     loop {
+        println!("Count: {}", count);
+
+        if count == 200 {
+            std::process::exit(0);
+        }
+
         match download_clipboard_file(&config, &previous_clipboard_text) {
             Ok(current) => {
                 if previous_clipboard_text != "" && previous_clipboard_text != current {
-                    //println!("\n{} != {}\n", previous_clipboard_text, current);
-                    std::fs::remove_file(previous_clipboard_text).unwrap();
+                    count = 0;
+                    let file_name = Path::new(&previous_clipboard_text)
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+
+                    let return_file_name = format!("{}\\{}", user_download_directory, file_name);
+                    
+                    std::fs::remove_file(return_file_name).unwrap();
                     previous_clipboard_text = current
                 } else {
+                    count += 1;
                     // stitch the path together
-                    previous_clipboard_text = current
+                    previous_clipboard_text = current;
                 }
             }
             Err(e) => {
+                count += 1;
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
                     eprintln!("\nFailed to download file: {}", e);
                 } else {
@@ -70,10 +108,20 @@ fn download_clipboard_file(
 ) -> Result<String, std::io::Error> {
     match get_clipboard_string() {
         Ok(s) => {
+            // let idk = Path::new(&s).file_name().unwrap().to_str().unwrap();
+            // let previous_name = Path::new(&_previous_clipboard_text)
+            //     .file_name()
+            //     .unwrap()
+            //     .to_str()
+            //     .unwrap();
+            println!("\nprevious: {}\ncurrent: {}", _previous_clipboard_text, s);
+            if s.trim() == _previous_clipboard_text.trim() {
+                println!("Not making a request");
+                return Err(Error::new(ErrorKind::AlreadyExists, "File already exists"));
+            }
             if s.starts_with("https://") || s.starts_with("https://") {
                 let response = get(&s).expect("Failed to send request");
                 if response.status().is_success() {
-                    //println!("{}", response.status());
                     let file_name = Path::new(&s)
                         .file_name()
                         .unwrap()
@@ -99,7 +147,6 @@ fn download_clipboard_file(
                         format!("{}\\{}", user_download_directory, file_name,);
                     if Path::new(&final_download_directory).exists() {
                         return Err(Error::new(ErrorKind::AlreadyExists, "File already exists"));
-                        //return Ok(s);
                     }
                     let mut dest =
                         File::create(final_download_directory).expect("Failed to create file");
@@ -111,7 +158,7 @@ fn download_clipboard_file(
                     );
                     // if no errors, return the clipboard back to the caller
                     let return_file_name = format!("{}\\{}", user_download_directory, file_name);
-                    return Ok(return_file_name);
+                    return Ok(s);
                 } else {
                     eprintln!("\nFailed to download file: {}", response.status());
                     Ok(s)
@@ -190,6 +237,7 @@ fn get_config() -> Option<Config> {
     let config_path = "./config.json".to_string();
     let config_file_exists = Path::new(&config_path).exists();
     if config_file_exists {
+        // println!("config file exists at {}", config_path);
         let config_file_string = fs::read_to_string(config_path).unwrap();
         let config = from_str(&config_file_string).unwrap();
         config
