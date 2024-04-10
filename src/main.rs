@@ -3,7 +3,8 @@ use std::{
     io::{self, Error, ErrorKind},
     path::Path,
     thread::sleep,
-    time::Duration,
+    time::{self, Duration},
+    u32,
 };
 
 use clipboard_win::get_clipboard_string;
@@ -41,7 +42,6 @@ fn main() {
     }
 
     let mut sys = sysinfo::System::new_all();
-
     sys.refresh_processes();
 
     for (pid, process) in sys.processes() {
@@ -57,22 +57,17 @@ fn main() {
         }
     }
 
-    // count how many times the same cb text has been copied
-    let mut count = 0;
     let user_download_directory = &config.download_directory;
+    let timer = time::Instant::now();
 
     loop {
-        println!("Count: {}", count);
-
-        // 200 is a little over 5 minutes
-        if count == 200 {
+        if timer.elapsed().as_secs() / 60 >= config.exit_time as u64 {
             std::process::exit(0);
         }
 
         match download_clipboard_file(&config, &previous_clipboard_text) {
             Ok(current) => {
                 if previous_clipboard_text != "" && previous_clipboard_text != current {
-                    count = 0;
                     let file_name = Path::new(&previous_clipboard_text)
                         .file_name()
                         .unwrap()
@@ -85,13 +80,11 @@ fn main() {
                     std::fs::remove_file(return_file_name).unwrap();
                     previous_clipboard_text = current
                 } else {
-                    count += 1;
                     // stitch the path together
                     previous_clipboard_text = current;
                 }
             }
             Err(e) => {
-                count += 1;
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
                     eprintln!("\nFailed to download file: {}", e);
                 } else {
@@ -159,7 +152,7 @@ fn download_clipboard_file(
                         file_name, user_download_directory
                     );
                     // if no errors, return the clipboard back to the caller
-                    let return_file_name = format!("{}\\{}", user_download_directory, file_name);
+                    //let return_file_name = format!("{}\\{}", user_download_directory, file_name);
                     return Ok(s);
                 } else {
                     eprintln!("\nFailed to download file: {}", response.status());
