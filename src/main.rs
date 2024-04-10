@@ -18,6 +18,7 @@ use winapi::um::winbase::CREATE_NO_WINDOW;
 struct Config {
     download_directory: String,
     file_types: Vec<String>,
+    exit_time: u32,
     debugger: bool,
 }
 
@@ -63,6 +64,7 @@ fn main() {
     loop {
         println!("Count: {}", count);
 
+        // 200 is a little over 5 minutes
         if count == 200 {
             std::process::exit(0);
         }
@@ -79,7 +81,7 @@ fn main() {
                         .to_string();
 
                     let return_file_name = format!("{}\\{}", user_download_directory, file_name);
-                    
+
                     std::fs::remove_file(return_file_name).unwrap();
                     previous_clipboard_text = current
                 } else {
@@ -211,7 +213,7 @@ fn config_prompt_helper_download_directory() -> String {
 
     // prompt for download_directory_p
     println!("Example Download Directory: C:\\Users\\ExampleUser\\Desktop");
-    println!("\nEnter a Downloads Directory: ");
+    println!("Enter a Downloads Directory: ");
     io::stdin().read_line(&mut download_dir_input).unwrap();
     download_dir_input = download_dir_input.trim_end().to_string();
 
@@ -222,13 +224,30 @@ fn config_prompt_helper_download_directory() -> String {
     }
 }
 
+fn config_prompt_helper_exit_time() -> u32 {
+    let mut exit_time_input = String::new();
+
+    println!("\nExample time: `10` for 10 minutes");
+    println!("Enter the time to exit the program: ");
+    io::stdin().read_line(&mut exit_time_input).unwrap();
+    exit_time_input = exit_time_input.trim_end().to_string();
+
+    if exit_time_input.is_empty() {
+        return 10;
+    } else {
+        return exit_time_input.parse::<u32>().unwrap();
+    }
+}
+
 fn prompt_user_for_config_values() -> Config {
     let download_directory: String = config_prompt_helper_download_directory();
     let file_types: Vec<String> = config_prompt_helper_file_types();
+    let exit_time: u32 = config_prompt_helper_exit_time();
 
     Config {
         download_directory,
         file_types,
+        exit_time,
         debugger: false,
     }
 }
